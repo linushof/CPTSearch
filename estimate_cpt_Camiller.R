@@ -61,9 +61,12 @@ overview <- left_join(nproblem, nsubjects, by=join_by(paper)) %>%
 # Ideally make code flexible to deal with all data sets
 # moreover: fitting strategy might be adjusted later to group by switching behavior
 
-paper <- dat_cpt %>% filter(paper == "Kellen16")
-
+#check for paper picks
 table(dat_cpt$paper)
+
+paper <- dat_cpt %>% filter(paper == "Camilleri09b")
+
+
 # create data objects for JAGS
 
 ## data that is the same for all subjects (but see ISSUES above)
