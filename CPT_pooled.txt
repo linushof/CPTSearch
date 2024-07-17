@@ -1,0 +1,50 @@
+model
+{
+
+  # priors
+
+	alpha ~ dunif(0,2)
+	gamma ~ dunif(0,4)
+	delta ~ dunif(0,5)
+	rho   ~ dunif(0,5)
+	
+	
+	# likelihood
+
+  for (i in start:stop)
+	{
+	
+	# CPT model
+
+  ## value function
+
+	vLA[i] <- pow(LA[i], alpha)
+	vHA[i] <- pow(HA[i], alpha)
+	vLB[i] <- pow(LB[i], alpha)
+	vHB[i] <- pow(HB[i], alpha)
+
+	## Goldstein-Einhorn (1987) weighting function
+
+	piHA[i] <- (delta * (pow(sprobHA[i], gamma))) / (delta * (pow(sprobHA[i], gamma)) + pow(sprobLA[i], gamma))
+	piLA[i] <- 1-piHA[i]
+	
+	piHB[i] <- (delta * (pow(sprobHB[i], gamma))) / (delta * (pow(sprobHB[i], gamma)) + pow(sprobLB[i], gamma))
+	piLB[i] <- 1-piHB[i]
+	
+	## weighting 
+
+	VA[i]  <- piHA[i] * vHA[i] + piLA[i] * vLA[i]
+	VB[i]  <- piHB[i] * vHB[i] + piLB[i] * vLB[i]
+
+	# rescale subjective values to alleviate possible parameter intercorrelations (cf. Krefeld-Schwalb et al., 2021; Stewart et al., 2018)
+
+	reVA[i] <- pow(VA[i], (1/alpha))
+	reVB[i] <- pow(VB[i], (1/alpha))
+
+	# stochastic choice rule
+
+	pB[i] <- (1)/(1+exp((-1*rho)*(reVB[i]-reVA[i])))
+	choice[i] ~ dbern(pB[i])
+	
+	}
+}

@@ -1,0 +1,98 @@
+# load packages 
+pacman::p_load(tidyverse)
+#package
+
+# read data
+data <- read.table("exp.txt") %>% as_tibble()
+
+# preprocessing -----------------------------------------------------------
+
+
+dat <- data %>% 
+  
+  rename(
+    
+    sample = trial, # sample number (trial is confusing as it is typically used to refer to a problem that a person solved)
+    attended = option # sampled option
+    
+  ) %>% 
+  
+  mutate( 
+    
+    ## ISSUE: some papers treat the same outcome as different outcome or did not specify the second probability; needs to be fixed
+    
+    # determine which outcome from which option was sampled to compute sampled probabilities (see below)      
+    seenA1 = if_else(attended == 0 & outcome == outA1, 1, 0) ,
+    seenA2 = if_else(attended == 0 & probA2 > 0 & outcome == outA2, 1, 0) ,
+    seenA3 = if_else(attended == 0 & probA3 > 0 & outcome == outA3, 1, 0) ,
+    seenA4 = if_else(attended == 0 & probA4 > 0 & outcome == outA4, 1, 0) ,
+    seenA5 = if_else(attended == 0 & probA5 > 0 & outcome == outA5, 1, 0) ,
+    
+    seenB1 = if_else(attended == 1 & outcome == outB1, 1, 0) ,
+    seenB2 = if_else(attended == 1 & probB2 > 0 & outcome == outB2, 1, 0) , 
+    seenB3 = if_else(attended == 0 & probB3 > 0 & outcome == outB3, 1, 0) ,
+    seenB4 = if_else(attended == 0 & probB4 > 0 & outcome == outB4, 1, 0) ,
+    seenB5 = if_else(attended == 0 & probB5 > 0 & outcome == outB5, 1, 0) 
+    
+    ) %>% 
+  
+  group_by(paper, id, subject, problem) %>% # to compute variables on trial level 
+  
+  mutate(
+    
+    # compute sample sizes 
+    
+    n_sample = max(sample) , # sample size
+    n_sample_1 = sum(attended) , # sample size option 1/B
+    n_sample_0 = n_sample - n_sample_1 , # sample size option 0/A
+    
+    # computes sampled probabilities 
+    
+    sprobA1 = sum(seenA1)/n_sample_0 , # sampled probability of outcome A1
+    sprobA2 = sum(seenA2)/n_sample_0 , 
+    sprobA3 = sum(seenA3)/n_sample_0 , 
+    sprobA4 = sum(seenA4)/n_sample_0 ,
+    sprobA5 = sum(seenA5)/n_sample_0 , 
+
+    sprobB1 = sum(seenB1)/n_sample_1 , 
+    sprobB2 = sum(seenB2)/n_sample_1 , 
+    sprobB3 = sum(seenB3)/n_sample_1 , 
+    sprobB4 = sum(seenB4)/n_sample_1 ,
+    sprobB5 = sum(seenB5)/n_sample_1 ,
+    
+    # compute switch rate 
+    
+    switch = ifelse(attended != lag(attended), 1, 0) , # did switch occur
+    n_switch = sum(switch, na.rm = TRUE) , # number of switches
+    r_switch = round(n_switch/((n_sample - 1)), 2) , # observed switch rate
+         
+  ) %>% 
+  
+  ungroup()
+
+
+## ISSUE: Not all sampled probabilities add up to 1 (see ISSUE comment above); paper are excluded for now, but issue should be fixed
+
+excl <-  dat %>% 
+  
+  mutate(
+  
+  checkA = round(sprobA1 + sprobA2 + sprobA3 + sprobA4 + sprobA5, 2) , 
+  checkB = round(sprobB1 + sprobB2 + sprobB3 + sprobB4 + sprobB5, 2)
+  
+  ) %>%
+  
+  filter(checkA != 1 | checkB != 1) %>% 
+  
+  distinct(paper)
+
+dat <- dat %>% filter(! paper %in% excl$paper)
+
+# remove redundant rows (only one row per trial)
+
+choices <- dat %>% 
+  group_by(paper, id, subject, problem) %>% 
+  mutate(stop = ifelse(sample == n_sample, 1, 0) ) %>% 
+  ungroup() %>% 
+  filter(stop == 1)
+
