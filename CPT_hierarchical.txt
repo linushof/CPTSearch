@@ -4,7 +4,7 @@ model{
 	
 	for (j in 1:nsub) { # subject loop
 	
-	  for (i in 1:nprob)	{ # problem loop
+	  for (i in 1:nprob[j])	{ # problem loop
 
       # subjective values
       
