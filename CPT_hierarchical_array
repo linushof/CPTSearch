@@ -34,7 +34,7 @@ model{
 	    # softmax choice rule
 
 	    pB[j,i] <- (1)/(1+exp((-1*rho[j])*(reVB[j,i]-reVA[j,i])))
-	    choice[j,i] ~ dbern(pB[j,i])
+	    choice[j,i] ~ dbern(pB[j,i])          #Bernoulli-distribution
 	  
 	  }
 	}

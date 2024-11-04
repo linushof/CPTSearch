@@ -8,33 +8,33 @@ model{
 
       # subjective values
       
-	    vLA[i,j] <- pow(LA[i,j], alpha[j])
-	    vHA[i,j] <- pow(HA[i,j], alpha[j])
-	    vLB[i,j] <- pow(LB[i,j], alpha[j])
-	    vHB[i,j] <- pow(HB[i,j], alpha[j])
+	    vLA[j,i] <- pow(LA[j,i], alpha[j]) 
+	    vHA[j,i] <- pow(HA[j,i], alpha[j])
+	    vLB[j,i] <- pow(LB[j,i], alpha[j])
+	    vHB[j,i] <- pow(HB[j,i], alpha[j])
 
 	    # decision weights
 
-	    piHA[i,j] <- (delta[j] * (pow(sprobHA[i,j], gamma[j]))) / (delta[j] * (pow(sprobHA[i,j], gamma[j])) + pow(sprobLA[i,j], gamma[j]))
-	    piLA[i,j] <- 1-piHA[i,j]
+	    piHA[j,i] <- (delta[j] * (pow(sprobHA[j,i], gamma[j]))) / (delta[j] * (pow(sprobHA[j,i], gamma[j])) + pow(sprobLA[j,i], gamma[j]))
+	    piLA[j,i] <- 1-piHA[j,i]
 	
-	    piHB[i,j] <- (delta[j] * (pow(sprobHB[i,j], gamma[j]))) / (delta[j] * (pow(sprobHB[i,j], gamma[j])) + pow(sprobLB[i,j], gamma[j]))
-	    piLB[i,j] <- 1-piHB[i,j]
+	    piHB[j,i] <- (delta[j] * (pow(sprobHB[j,i], gamma[j]))) / (delta[j] * (pow(sprobHB[j,i], gamma[j])) + pow(sprobLB[j,i], gamma[j]))
+	    piLB[j,i] <- 1-piHB[j,i]
 	
 	    # valuations
 
-	    VA[i,j]  <- piHA[i,j] * vHA[i,j] + piLA[i,j] * vLA[i,j]
-	    VB[i,j]  <- piHB[i,j] * vHB[i,j] + piLB[i,j] * vLB[i,j]
+	    VA[j,i]  <- piHA[j,i] * vHA[j,i] + piLA[j,i] * vLA[j,i]
+	    VB[j,i]  <- piHB[j,i] * vHB[j,i] + piLB[j,i] * vLB[j,i]
 
 	    # rescaling valuations (cf. Krefeld-Schwalb et al., 2021; Stewart et al., 2018)
 
-	    reVA[i,j] <- pow(VA[i,j], (1/alpha[j]))
-	    reVB[i,j] <- pow(VB[i,j], (1/alpha[j]))
+	    reVA[j,i] <- pow(VA[j,i], (1/alpha[j]))
+	    reVB[j,i] <- pow(VB[j,i], (1/alpha[j]))
 
 	    # softmax choice rule
 
-	    pB[i,j] <- (1)/(1+exp((-1*rho[j])*(reVB[i,j]-reVA[i,j])))
-	    choice[i,j] ~ dbern(pB[i,j])
+	    pB[j,i] <- (1)/(1+exp((-1*rho[j])*(reVB[j,i]-reVA[j,i])))
+	    choice[j,i] ~ dbern(pB[j,i])          #Bernoulli-distribution
 	  
 	  }
 	}
