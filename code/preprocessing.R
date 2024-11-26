@@ -1,12 +1,10 @@
 # load packages 
 pacman::p_load(tidyverse)
-#package
 
 # read data
-data <- read.table("exp.txt") %>% as_tibble()
+data <- read.table("data/exp.txt") %>% as_tibble()
 
 # preprocessing -----------------------------------------------------------
-
 
 dat <- data %>% 
   
@@ -96,3 +94,4 @@ choices <- dat %>%
   ungroup() %>% 
   filter(stop == 1)
 
+write_rds(choices, "data/trial_summaries.rds.bz2", compress = "bz2")
