@@ -1,9 +1,10 @@
-# preparation -------------------------------------------------------------
+# Preparation -------------------------------------------------------------
 
 # load pkgs
 pacman::p_load(tidyverse, R2jags)
 
-# Data set: Gloeckner (2012) ------------------------------------------------------------
+
+# Gloeckner (2012) ------------------------------------------------------------
 
 paper <- read_rds("data/cpt/cpt_gloeckner12.rds.bz2")
 
@@ -103,9 +104,11 @@ data_list$sprobHB+data_list$sprobLB
 
 # summary of posterior distributions
 
-fits <- mfit$BUGSoutput$summary %>% round(4) %>%  as_tibble(rownames = "parameter")
+estimates <- mfit$BUGSoutput$summary %>% round(4) %>%  as_tibble(rownames = "parameter")
+posteriors <- mfit$BUGSoutput$sims.matrix %>% as_tibble()
 
 papername <- unique(paper$paper)
-write_rds(fits, paste("data/cpt/cpt_", tolower(papername), "_estimates.rds.bz2", sep =""), compress = "bz2")
+write_rds(estimates, paste("data/cpt/cpt_", tolower(papername), "_estimates.rds.bz2", sep =""), compress = "bz2")
+write_rds(posteriors, paste("data/cpt/cpt_", tolower(papername), "_posteriors.rds.bz2", sep =""), compress = "bz2")
 
 

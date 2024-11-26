@@ -1,3 +1,6 @@
+# Preparation -------------------------------------------------------------
+
+
 # load packages
 pacman::p_load(tidyverse , 
                R2jags ,
@@ -8,7 +11,8 @@ pacman::p_load(tidyverse ,
 # load data
 choices <- read_rds("data/trial_summaries.rds.bz2")
 
-# prepare data for CPT --------------------------------------------------------------------
+
+# Data Selection --------------------------------------------------------------------
 
 
 dat_cpt <- choices %>% 
@@ -100,7 +104,7 @@ overview_plot <- wrap_plots(plots, ncol = 4)
 print(overview_plot)
 
 
-# Data set: Glöckner 2012 ----------------------------------------------------------------
+# Data set: Gloeckner (2012) ----------------------------------------------------------------
 
 # pick paper
 papername <- "Gloeckner12"
