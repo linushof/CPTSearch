@@ -1,12 +1,16 @@
+# README --------------------------------------------------------------------
+
+'The dataset of Wulff et al. (2018) can be retrieved from: https://www.dirkwulff.org/#data)'
+
+# Preparation -------------------------------------------------------------
+
 # load packages 
 pacman::p_load(tidyverse)
-#package
 
-# read data
-data <- read.table("exp.txt") %>% as_tibble()
+# read data (can be retrieved from: ) 
+data <- read.table("data/exp.txt") %>% as_tibble()
 
-# preprocessing -----------------------------------------------------------
-
+# Preprocessing -----------------------------------------------------------
 
 dat <- data %>% 
   
@@ -96,3 +100,7 @@ choices <- dat %>%
   ungroup() %>% 
   filter(stop == 1)
 
+
+# Storing -----------------------------------------------------------------
+
+write_rds(choices, "data/trial_summaries.rds.bz2", compress = "bz2")
