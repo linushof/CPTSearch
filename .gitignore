@@ -9,5 +9,6 @@
 *.docx
 *.pptx
 *.xlsx
+*.png
 # folders 
 data/
