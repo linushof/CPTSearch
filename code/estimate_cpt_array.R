@@ -6,9 +6,19 @@ pacman::p_load(tidyverse, R2jags)
 
 # Gloeckner (2012) ------------------------------------------------------------
 
-paper <- read_rds("data/cpt_gloeckner12.rds.bz2")
-
+paper <- read_rds("data/PreprocessedPaperData/cpt_gloeckner12.rds.bz2")
 papername <- unique(paper$paper)
+
+#Get vector of the number of solved problems per participant
+nsolvedprob <- paper %>% 
+  group_by(subject) %>% 
+  summarise(nsolvedprob = n()) 
+
+nsolvedprob <- nsolvedprob$nsolvedprob
+
+#Create a list of subject and the respective switch rate
+switch_rate_data <- subset(paper, select = c(subject, r_switch, cat_switch))
+
 ## create data object for JAGS
 # create Array 
 
@@ -19,19 +29,15 @@ preArrayData <- preArrayData %>%
 
 split_data <- split(preArrayData, preArrayData$subject)
 
-nsolvedprob <- paper %>% 
-  group_by(subject) %>% 
-  summarise(nsolvedprob = n()) 
-nsolvedprob <- nsolvedprob$nsolvedprob
-
+#Get max number of problems 
 problems <- paper %>% distinct(problem) 
+nprob <- nrow(problems) 
 
-nprob <- nrow(problems) # max number of problems
+#Get number of subjects
+nsub <-length(unique(paper$subject)) 
 
-
-nsub <-length(unique(paper$subject)) # number of subjects
-
-num_cols <- ncol(preArrayData) - 1  #number of columns without subject
+#number of columns without subject
+num_cols <- ncol(preArrayData) - 1 
 
 # initiate Array
 data_array <- array(NA, dim = c(nprob, num_cols, nsub))
@@ -50,9 +56,6 @@ data_array
 # Converge array in list again to have NAs in the end of each element vector
 # Due to control variable in model code the NAs won't be taken into account
 
-nsolvedprob #double check number of solved problems per participant
-nsub  #double check number of subjects
-
 ## load and prepare data ---------------------------------------------------
 
 data_list <- list(
@@ -66,9 +69,7 @@ data_list <- list(
   sprobLA = apply(t(data_array[, 4, ]),2, as.numeric),
   sprobHB = apply(t(data_array[, 6, ]),2, as.numeric),
   sprobLB = apply(t(data_array[, 8, ]),2, as.numeric),  
-  choice = apply(t(data_array[, 9, ]) ,2, as.numeric),
-  r_switch =  apply(t(data_array[, 10, ]),2, as.numeric),
-  cat_switch =  apply(t(data_array[, 12, ]),2, as.numeric)
+  choice = apply(t(data_array[, 9, ]) ,2, as.numeric)
 )
 
 ## fitting ------------------------------------------------------------
@@ -114,7 +115,6 @@ data_list$sprobHB+data_list$sprobLB
 ## store results -----------------------------------------------------------------
 
 # traceplot(mfit) # can be cumbersome with many subjecyts
-
 
 # summary of posterior distributions
 
@@ -166,62 +166,15 @@ mu.weights %>%
   scale_x_continuous(breaks = seq(0, 1, length.out = 3)) +
   scale_y_continuous(breaks = seq(0, 1, length.out = 3)) +
   labs(title = papername, x = "p", y = "w(p)") +
-  geom_line(data=ind.weights, aes(group=subject), color = "gray") + 
-  geom_abline(intercept=0, slope =1, linewidth = 1, "black", linetype = "dashed") +
-  geom_line(linewidth = 1, color = "black") +
-  theme_classic()+theme(
-    plot.title = element_text(
-      size = 20,    
-      face = "bold",  
-      hjust = 0.5
-    ))
-
-
-
-# plot
-mu.weights %>% 
-  ggplot(aes(p, w)) +
-  scale_x_continuous(breaks = seq(0, 1, length.out = 3)) +
-  scale_y_continuous(breaks = seq(0, 1, length.out = 3)) +
-  labs(title = papername, x = "p",
-       y = "w(p)") +
-  geom_line(data=ind.weights, aes(group=subject), color = "gray") + 
-  geom_abline(intercept=0, slope =1, linewidth = 1, "black", linetype = "dashed") +
-  geom_line(linewidth = 1, color = "black") +
-  theme_classic()+theme(
-    plot.title = element_text(
-      size = 20,    
-      face = "bold",  
-      hjust = 0.5
-    ))
-
-
-# Median der Spalte r_switch berechnen
-median_r_switch <- median(ind.weights$r_switch, na.rm = TRUE)
-
-# Neue Spalte hinzufügen, die angibt, ob r_switch über oder unter dem Median liegt
-ind.weights <- ind.weights %>%
-  mutate(r_switch_group = ifelse(r_switch > median_r_switch, "Above Median", "Below Median"))
-
-# Plot erstellen
-mu.weights %>%
-  ggplot(aes(p, w)) +
-  scale_x_continuous(breaks = seq(0, 1, length.out = 3)) +
-  scale_y_continuous(breaks = seq(0, 1, length.out = 3)) +
-  labs(title = papername, x = "p", y = "w(p)") +
-  geom_line(data = ind.weights, aes(group = subject, color = r_switch_group), linewidth = 1) +
-  geom_abline(intercept = 0, slope = 1, linewidth = 1, color = "black", linetype = "dashed") +
-  geom_line(linewidth = 1, color = "black") +
-  theme_classic() +
-  theme(
-    plot.title = element_text(
-      size = 20,
-      face = "bold",
-      hjust = 0.5
-    ),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 10)
-  )
-
-##
-
+       geom_line(data=ind.weights, aes(group=subject), color = "gray") + 
+       geom_abline(intercept=0, slope =1, linewidth = 1, "black", linetype = "dashed") +
+       geom_line(linewidth = 1, color = "black") +
+       theme_classic()+theme(
+         plot.title = element_text(
+           size = 20,    
+           face = "bold",  
+           hjust = 0.5
+         ))
+     
+     
+  
