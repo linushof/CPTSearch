@@ -17,7 +17,11 @@ nsolvedprob <- paper %>%
 nsolvedprob <- nsolvedprob$nsolvedprob
 
 #Create a list of subject and the respective switch rate
-switch_rate_data <- subset(paper, select = c(subject, r_switch, cat_switch))
+switch_rate_data <- paper %>%
+  select(subject, cat_switch, avg_switchrate) %>% 
+  distinct() 
+
+switch_rate_data$subject <- seq_len(nrow(switch_rate_data))
 
 ## create data object for JAGS
 # create Array 
@@ -50,8 +54,6 @@ for (i in 1:nsub) {
 
 # check dimension
 dim(data_array)
-
-data_array
 
 # Converge array in list again to have NAs in the end of each element vector
 # Due to control variable in model code the NAs won't be taken into account
@@ -88,7 +90,7 @@ params_init <- function(){
        "probit.gamma" = qnorm(rnorm(nsub, .5, .1)) ,
        "probit.delta" = qnorm(rnorm(nsub, .7, .1)) , 
        "probit.rho" = qnorm(rep(.01, nsub) ))
-}
+} 
 
 
 # run JAGS model
@@ -107,6 +109,10 @@ mfit <- jags.parallel(
   DIC = TRUE # store all posterior samples
 )
 
+
+
+
+
 # sanity check 2
 data_list$sprobHA+data_list$sprobLA
 data_list$sprobHB+data_list$sprobLB
@@ -114,7 +120,7 @@ data_list$sprobHB+data_list$sprobLB
 
 ## store results -----------------------------------------------------------------
 
-# traceplot(mfit) # can be cumbersome with many subjecyts
+# traceplot(mfit) # can be cumbersome with many subjects
 
 # summary of posterior distributions
 
@@ -124,6 +130,15 @@ posteriors <- mfit$BUGSoutput$sims.matrix %>% as_tibble()
 papername <- unique(paper$paper)
 write_rds(estimates, paste("data/PostEst/cpt_", tolower(papername), "_estimates.rds.bz2", sep =""), compress = "bz2")
 write_rds(posteriors, paste("data/PostEst/cpt_", tolower(papername), "_posteriors.rds.bz2", sep =""), compress = "bz2")
+
+
+# Create summary dataframe with estimates per subject
+parameter_data <- estimates %>%
+  mutate(subject = as.numeric(gsub(".*\\[(\\d+)\\]", "\\1", parameter)),  # Extrahiert Subjekt-ID
+         param_name = gsub("\\[.*", "", parameter)) %>%                  # Extrahiert Parametername
+  select(subject, param_name, mean) %>%                                 # Relevante Spalten
+  pivot_wider(names_from = param_name, values_from = mean)              # Parameter als Spalten
+
 
 #plots
 # summary of posterior distributions
@@ -160,21 +175,48 @@ ind.weights <- ind.fits %>%
   expand_grid(p = seq(0, 1, .01)) %>% # create vector of sampled relative frequencies
   mutate(w = round(  (delta * p^gamma)/ ((delta * p^gamma)+(1-p)^gamma), 4)) 
 
-# plot
+ind.weights <- left_join(ind.weights, switch_rate_data, by = "subject")
+
+#Weighted Probability plots
 mu.weights %>% 
   ggplot(aes(p, w)) +
-  scale_x_continuous(breaks = seq(0, 1, length.out = 3)) +
-  scale_y_continuous(breaks = seq(0, 1, length.out = 3)) +
-  labs(title = papername, x = "p", y = "w(p)") +
-       geom_line(data=ind.weights, aes(group=subject), color = "gray") + 
-       geom_abline(intercept=0, slope =1, linewidth = 1, "black", linetype = "dashed") +
-       geom_line(linewidth = 1, color = "black") +
-       theme_classic()+theme(
-         plot.title = element_text(
-           size = 20,    
-           face = "bold",  
-           hjust = 0.5
-         ))
-     
-     
-  
+  scale_x_continuous(
+    breaks = seq(0, 1, by = 0.25), 
+    labels = scales::number_format(accuracy = 0.01) # Dezimalformat mit zwei Nachkommastellen
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, 1, by = 0.25), 
+    labels = scales::number_format(accuracy = 0.01) # Dezimalformat mit zwei Nachkommastellen
+  ) +
+  labs(
+    title = papername,
+    x = "p",
+    y = "w(p)"
+  ) +
+  # Linien einfärben basierend auf cat_switch
+  geom_line(data = ind.weights, aes(group = subject, color = as.factor(cat_switch)), alpha = 0.8) +
+  scale_color_manual(
+    values = c("0" = "#D55E00", "1" = "#0072B2"), # Farbschema (Orange und Blau)
+    labels = c("0" = "Low Frequency Switcher", "1" = "High Frequency Switcher") # Beschriftungen ohne Titel
+  ) +
+  # Diagonale gestrichelte Linie
+  geom_abline(intercept = 0, slope = 1, linewidth = 1, color = "black", linetype = "dashed") +
+  # Dicke schwarze Hauptlinie
+  geom_line(linewidth = 1.2, color = "black") +
+  # Klassisches Theme für hellen Hintergrund
+  theme_classic(base_size = 14) +
+  theme(
+    plot.title = element_text(size = 20, face = "bold", hjust = 0.5, color = "black"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(color = "black"),
+    legend.position = "bottom", # Legende unterhalb des Plots
+    legend.text = element_text(color = "black"),
+    legend.title = element_blank(), # Entfernt den Titel der Legende
+    panel.background = element_rect(fill = "white", color = NA), # Heller Hintergrund
+    plot.background = element_rect(fill = "white", color = NA) # Heller Plot-Rahmen
+  )
+
+
+
+
+
