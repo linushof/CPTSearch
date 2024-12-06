@@ -56,6 +56,13 @@ nproblem <- dat_cpt %>%
   distinct(problem) %>% 
   summarise(nproblem = n()) 
 
+switch_rate_subj <-  dat_cpt %>%
+  group_by(paper) %>%
+  summarise(
+    avg_switch_rate = mean(switch_rate, na.rm = TRUE), # Durchschnitt pro Paper
+    nsubjects = n() # Anzahl der Subjekte pro Paper
+  )
+
 nsubjects <- dat_cpt %>% 
   group_by(paper) %>% 
   distinct(subject) %>% 
