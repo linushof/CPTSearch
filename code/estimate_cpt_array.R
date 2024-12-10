@@ -216,6 +216,10 @@ mu.weights %>%
     plot.background = element_rect(fill = "white", color = NA) # Heller Plot-Rahmen
   )
 
+ggplot(ind.weights, aes(x = p, y = gamma, color = factor(subject))) +
+  geom_point() +  # Punkte für jedes Subject
+  labs(x = "p", y = "Gamma", title = "Verteilung von Gamma in Bezug auf p") +
+  theme_minimal()
 
 
 
