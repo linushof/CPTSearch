@@ -178,48 +178,61 @@ ind.weights <- ind.fits %>%
 ind.weights <- left_join(ind.weights, switch_rate_data, by = "subject")
 
 #Weighted Probability plots
-mu.weights %>% 
+prob_weight_plot <- mu.weights %>% 
   ggplot(aes(p, w)) +
   scale_x_continuous(
     breaks = seq(0, 1, by = 0.25), 
-    labels = scales::number_format(accuracy = 0.01) # Dezimalformat mit zwei Nachkommastellen
+    labels = scales::number_format(accuracy = 0.01)
   ) +
   scale_y_continuous(
     breaks = seq(0, 1, by = 0.25), 
-    labels = scales::number_format(accuracy = 0.01) # Dezimalformat mit zwei Nachkommastellen
+    labels = scales::number_format(accuracy = 0.01) 
   ) +
   labs(
     title = papername,
     x = "p",
     y = "w(p)"
   ) +
-  # Linien einfärben basierend auf cat_switch
   geom_line(data = ind.weights, aes(group = subject, color = as.factor(cat_switch)), alpha = 0.8) +
   scale_color_manual(
     values = c("0" = "#D55E00", "1" = "#0072B2"), # Farbschema (Orange und Blau)
     labels = c("0" = "Low Frequency Switcher", "1" = "High Frequency Switcher") # Beschriftungen ohne Titel
   ) +
-  # Diagonale gestrichelte Linie
   geom_abline(intercept = 0, slope = 1, linewidth = 1, color = "black", linetype = "dashed") +
-  # Dicke schwarze Hauptlinie
   geom_line(linewidth = 1.2, color = "black") +
-  # Klassisches Theme für hellen Hintergrund
   theme_classic(base_size = 14) +
   theme(
     plot.title = element_text(size = 20, face = "bold", hjust = 0.5, color = "black"),
     axis.text = element_text(color = "black"),
     axis.title = element_text(color = "black"),
-    legend.position = "bottom", # Legende unterhalb des Plots
+    legend.position = "bottom", 
     legend.text = element_text(color = "black"),
-    legend.title = element_blank(), # Entfernt den Titel der Legende
-    panel.background = element_rect(fill = "white", color = NA), # Heller Hintergrund
-    plot.background = element_rect(fill = "white", color = NA) # Heller Plot-Rahmen
+    legend.title = element_blank(), 
+    panel.background = element_rect(fill = "white", color = NA), 
+    plot.background = element_rect(fill = "white", color = NA) 
   )
+prob_weight_plot
+ggsave(filename = paste0("plots/ProbWeighting/ProbWeighting_", papername, ".png"), plot = prob_weight_plot)
+?ggsave
+
+#Distribution Gamma
 
 ggplot(ind.weights, aes(x = p, y = gamma, color = factor(subject))) +
   geom_point() +  # Punkte für jedes Subject
   labs(x = "p", y = "Gamma", title = "Verteilung von Gamma in Bezug auf p") +
   theme_minimal()
+
+#Logistic Regression
+logit_model <- glm(cat_switch ~ gamma + delta, 
+                   data = ind.weights, 
+                   family = binomial)
+
+
+#Summary
+summary(logit_model)
+exp(coef(logit_model))
+
+
 
 
 
