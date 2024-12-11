@@ -2,11 +2,11 @@
 
 # load pkgs
 pacman::p_load(tidyverse, R2jags)
-
+library(viridis)
 
 # Gloeckner (2012) ------------------------------------------------------------
 
-paper <- read_rds("data/PreprocessedPaperData/cpt_gloeckner12.rds.bz2")
+paper <- read_rds("data/PreprocessedPaperData/cpt_hertwig04.rds.bz2")
 papername <- unique(paper$paper)
 
 #Get vector of the number of solved problems per participant
@@ -110,9 +110,6 @@ mfit <- jags.parallel(
 )
 
 
-
-
-
 # sanity check 2
 data_list$sprobHA+data_list$sprobLA
 data_list$sprobHB+data_list$sprobLB
@@ -185,7 +182,7 @@ prob_weight_plot <- mu.weights %>%
     labels = scales::number_format(accuracy = 0.01)
   ) +
   scale_y_continuous(
-    breaks = seq(0, 1, by = 0.25), 
+    breaks = seq(0, 1, by = 0.25),
     labels = scales::number_format(accuracy = 0.01) 
   ) +
   labs(
@@ -193,10 +190,13 @@ prob_weight_plot <- mu.weights %>%
     x = "p",
     y = "w(p)"
   ) +
-  geom_line(data = ind.weights, aes(group = subject, color = as.factor(cat_switch)), alpha = 0.8) +
-  scale_color_manual(
-    values = c("0" = "#D55E00", "1" = "#0072B2"), # Farbschema (Orange und Blau)
-    labels = c("0" = "Low Frequency Switcher", "1" = "High Frequency Switcher") # Beschriftungen ohne Titel
+  geom_line(data = ind.weights, aes(group = subject, color = avg_switchrate), alpha = 0.8) +
+  scale_color_viridis_c(
+    option = "plasma",  
+    name = "Average Switching Rate",  
+    breaks = c(0, 0.25, 0.5, 0.75, 1),  
+    labels = scales::number_format(accuracy = 0.01),
+    limits = c(0, 1) 
   ) +
   geom_abline(intercept = 0, slope = 1, linewidth = 1, color = "black", linetype = "dashed") +
   geom_line(linewidth = 1.2, color = "black") +
@@ -205,33 +205,55 @@ prob_weight_plot <- mu.weights %>%
     plot.title = element_text(size = 20, face = "bold", hjust = 0.5, color = "black"),
     axis.text = element_text(color = "black"),
     axis.title = element_text(color = "black"),
-    legend.position = "bottom", 
-    legend.text = element_text(color = "black"),
-    legend.title = element_blank(), 
+    legend.position = "bottom",  
+    legend.direction = "horizontal",  
+    legend.box = "horizontal",  
+    legend.title.align = 0.5, 
+    legend.text = element_text(size = 10, color = "black"),  
+    legend.title = element_text(size = 12, face = "plain", hjust = 0.5, vjust =0.8),  
+    legend.key.width = unit(2, "cm"),  
+    legend.spacing.y = unit(2.5, "cm"),  
     panel.background = element_rect(fill = "white", color = NA), 
-    plot.background = element_rect(fill = "white", color = NA) 
+    plot.background = element_rect(fill = "white", color = NA) ,
   )
+
+
 prob_weight_plot
+
 ggsave(filename = paste0("plots/ProbWeighting/ProbWeighting_", papername, ".png"), plot = prob_weight_plot)
-?ggsave
+
 
 #Distribution Gamma
 
-ggplot(ind.weights, aes(x = p, y = gamma, color = factor(subject))) +
-  geom_point() +  # Punkte für jedes Subject
-  labs(x = "p", y = "Gamma", title = "Verteilung von Gamma in Bezug auf p") +
-  theme_minimal()
+#ggplot(ind.weights, aes(x = p, y = gamma, color = factor(subject))) +
+ # geom_point() +  
+#  labs(x = "p", y = "Gamma", title = "Gamma distribution") +
+#  theme_minimal()
 
 #Logistic Regression
 logit_model <- glm(cat_switch ~ gamma + delta, 
                    data = ind.weights, 
                    family = binomial)
+summary(logit_model)
+
+exp(coef(logit_model))
+pR2(logit_model)
+
+#Lineare Regression
+lin_model_gamma <- lm(gamma ~ avg_switchrate, 
+                   data = ind.weights)
+lin_model_delta <- lm(delta ~ avg_switchrate, 
+                data = ind.weights)
+lin_model_alpha <- lm(alpha ~ avg_switchrate, 
+                data = ind.weights)
 
 
 #Summary
-summary(logit_model)
-exp(coef(logit_model))
+summary(lin_model_gamma)
+summary(lin_model_delta)
 
+exp(coef(logit_model))
+pR2(logit_model)
 
 
 
