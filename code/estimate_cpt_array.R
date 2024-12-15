@@ -154,7 +154,7 @@ mu.fits <- fits %>%
 mu.weights <- mu.fits %>% 
   select(subject, parameter, mean) %>% 
   pivot_wider(names_from = parameter, values_from = mean) %>% 
-  select(-c(alpha, rho)) %>%
+ # select(-c(alpha, rho)) %>%
   expand_grid(p = seq(0, 1, .01)) %>% # create vector of sampled relative frequencies
   mutate(w = round(  (delta * p^gamma)/ ((delta * p^gamma)+(1-p)^gamma), 4)) 
 
@@ -175,6 +175,7 @@ ind.weights <- ind.fits %>%
 ind.weights <- left_join(ind.weights, switch_rate_data, by = "subject")
 
 #Weighted Probability plots
+median_switch_rate <- median(ind.weights$avg_switchrate, na.rm = TRUE)
 prob_weight_plot <- mu.weights %>% 
   ggplot(aes(p, w)) +
   scale_x_continuous(
@@ -216,23 +217,78 @@ prob_weight_plot <- mu.weights %>%
     panel.background = element_rect(fill = "white", color = NA), 
     plot.background = element_rect(fill = "white", color = NA) ,
   )
+# Berechnung des Medians der avg_switchrate
+median_switch_rate <- median(ind.weights$avg_switchrate, na.rm = TRUE)
+
+# Berechnung des Medians der avg_switchrate
+median_switch_rate <- median(ind.weights$avg_switchrate, na.rm = TRUE)
+
+# Erstellen des Plots
+prob_weight_plot <- mu.weights %>% 
+  ggplot(aes(p, w)) +
+  scale_x_continuous(
+    breaks = seq(0, 1, by = 0.25), 
+    labels = scales::number_format(accuracy = 0.01)
+  ) +
+  scale_y_continuous(
+    breaks = seq(0, 1, by = 0.25),
+    labels = scales::number_format(accuracy = 0.01) 
+  ) +
+  labs(
+    title = papername,
+    x = "p",
+    y = "w(p)"
+  ) +
+  geom_line(data = ind.weights, aes(group = subject, color = avg_switchrate), alpha = 0.8) +
+  scale_color_viridis_c(
+    option = "plasma",  
+    name = "Average Switching Rate",  # Titel der Legende
+    breaks = c(0, 0.25, 0.5, 0.75, 1, median_switch_rate),  # Füge den Median hinzu
+    labels = c("0", "0.25", "0.5", "0.75", "1", sprintf("Median: %.2f", median_switch_rate))  # Labels mit Median
+  ) +
+  geom_abline(intercept = 0, slope = 1, linewidth = 1, color = "black", linetype = "dashed") +
+  geom_line(linewidth = 1.2, color = "black") +
+  theme_classic(base_size = 14) +
+  theme(
+    plot.title = element_text(size = 20, face = "bold", hjust = 0.5, color = "black"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(color = "black"),
+    legend.position = "bottom",  
+    legend.direction = "horizontal",  
+    legend.box = "horizontal",  
+    legend.title.align = 0.5, 
+    legend.text = element_text(size = 10, color = "black"),  
+    legend.title = element_text(size = 12, face = "plain", hjust = 0.5),  
+    legend.key.width = unit(1.5, "cm"),  
+    legend.spacing.y = unit(0.2, "cm"),  
+    panel.background = element_rect(fill = "white", color = NA), 
+    plot.background = element_rect(fill = "white", color = NA)
+  )
 
 
 prob_weight_plot
 
 ggsave(filename = paste0("plots/ProbWeighting/ProbWeighting_", papername, ".png"), plot = prob_weight_plot)
 
+#regression data preparations
+
+data_regression <- fits %>%
+  mutate(
+    subject = as.integer(str_extract(parameter, "\\d+")), 
+    parameter = str_remove(parameter, "\\[\\d+\\]")        
+  ) %>%
+  select(subject, parameter, mean) %>%                     
+  pivot_wider(
+    names_from = parameter,                                
+    values_from = mean                                     
+  )
+
+data_regression <- left_join(data_regression, switch_rate_data, by = "subject")
 
 #Distribution Gamma
-
-#ggplot(ind.weights, aes(x = p, y = gamma, color = factor(subject))) +
- # geom_point() +  
-#  labs(x = "p", y = "Gamma", title = "Gamma distribution") +
-#  theme_minimal()
-
 #Logistic Regression
 logit_model <- glm(cat_switch ~ gamma + delta, 
-                   data = ind.weights, 
+                   data = data_regression, 
                    family = binomial)
 summary(logit_model)
 
@@ -241,19 +297,19 @@ pR2(logit_model)
 
 #Lineare Regression
 lin_model_gamma <- lm(gamma ~ avg_switchrate, 
-                   data = ind.weights)
+                   data = data_regression)
 lin_model_delta <- lm(delta ~ avg_switchrate, 
-                data = ind.weights)
+                data = data_regression)
 lin_model_alpha <- lm(alpha ~ avg_switchrate, 
-                data = ind.weights)
+                data_regression)
 
 
 #Summary
 summary(lin_model_gamma)
 summary(lin_model_delta)
+summary(lin_model_alpha)
 
-exp(coef(logit_model))
-pR2(logit_model)
+
 
 
 
