@@ -36,7 +36,14 @@ dat <- data %>%
     seenB2 = if_else(attended == 1 & probB2 > 0 & outcome == outB2, 1, 0) , 
     seenB3 = if_else(attended == 0 & probB3 > 0 & outcome == outB3, 1, 0) ,
     seenB4 = if_else(attended == 0 & probB4 > 0 & outcome == outB4, 1, 0) ,
-    seenB5 = if_else(attended == 0 & probB5 > 0 & outcome == outB5, 1, 0) 
+    seenB5 = if_else(attended == 0 & probB5 > 0 & outcome == outB5, 1, 0) ,
+    
+    #Making sure that if two cases are the same within either option A or B it is treated as a safe option
+    
+    probB1 = ifelse(probB1 == probB2 & seenB1 == seenB2 & outB1 == outB2, 1, probB1),
+    probB2 = ifelse(probB1 == 1 & seenB1 == seenB2 & outB1 == outB2, 0, probB2),
+    seenB1 = ifelse(probB1 == probB2 & seenB1 == seenB2 & outB1 == outB2, 1, seenB1),
+    seenB2 = ifelse(probB1 == 1 & seenB1 == seenB2 & outB1 == outB2, 0, seenB2)
     
     ) %>% 
   
@@ -73,6 +80,13 @@ dat <- data %>%
   ) %>% 
   
   ungroup()
+
+#Prefilter events that don't add up to a prob of 1 or sprob of 1
+dat <- dat %>% filter((probA1 + probA2 + probA3 + probA4 + probA5 == 1) & 
+                        (probB1 + probB2 + probB3 + probB4 + probB5 ==1) & 
+                        (sprobA1 + sprobA2 + sprobA3 + sprobA4 + sprobA5 ==1) & 
+                        (sprobB1 + sprobB2 + sprobB3 + sprobB4 + sprobB5 ==1))
+
 
 
 ## ISSUE: Not all sampled probabilities add up to 1 (see ISSUE comment above); paper are excluded for now, but issue should be fixed
