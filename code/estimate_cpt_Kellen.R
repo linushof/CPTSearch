@@ -39,15 +39,6 @@ overview <- left_join(nproblem, nsubjects, by=join_by(paper)) %>%
   mutate(nchoice = nproblem * nsubject)
 
 
-# use Kellen (2016) data for demonstration (comprehensive data set with no/few issues, see also comment below)
-# possible ISSUES with other data sets that need to be fixed : Missings, not all subjects solve the same set of problems, duplicate subject-problem pairings in different data sets (id) within a paper (e.g. Erev)
-# none of these issues in Kellen16, however, for other data sets, code below needs to be adapted. 
-# Ideally make code flexible to deal with all data sets
-# moreover: fitting strategy might be adjusted later to group by switching behavior
-
-
-
-
 # create data objects for JAGS
 
 ## data that is the same for all subjects (but see ISSUES above)
