@@ -8,18 +8,7 @@ library(tools)
 
 # Initialization of regression and parameter plot data frames ------------------------------------------------------------
 
-reg_results_list <- empty_dataframe <- data.frame(
-  Term = character(0),         
-  Paper = character(0),        
-  Estimate_gamma = numeric(0), 
-  P_Value_gamma = numeric(0),  
-  Estimate_delta = numeric(0), 
-  P_Value_delta = numeric(0),  
-  Estimate_alpha = numeric(0), 
-  P_Value_alpha = numeric(0),
-  Estimate_rho = numeric(0), 
-  P_Value_rho = numeric(0)
-  )  
+reg_results_list <-  data.frame()  
   
 parameters_plot_data <- data.frame(
     subject = integer(0),      
@@ -49,7 +38,9 @@ parameters_df <- data.frame(
 
 # Constitute valid papers ------------------------------------------------------------
 valid_papers <- c("Gloeckner12", "Ungemach09", "Rakow08", "noguchi15","hertwig04")
-
+valid_papers <- c("Gloeckner12")
+valid_papers <- c("Kellen16")
+paper <- read_rds(glue("data/PreprocessedPaperData/cpt_Gloeckner12.rds.bz2"))
 
 #Loop across all papers using JAGS + Generate Estimates + Regression
 for (p in valid_papers) {
@@ -132,11 +123,11 @@ for (p in valid_papers) {
     list("mu.probit.alpha" = qnorm(rnorm(1, .4, .1)) , # hyper parameters (mu. prefix refers to  group level)
          "mu.probit.gamma" = qnorm(rnorm(1, .5, .1)) ,
          "mu.probit.delta" = qnorm(rnorm(1, .7, .1)) , 
-        "mu.probit.rho" = qnorm(.01) ,  
+        "mu.probit.rho" = 0,  
         "probit.alpha" = qnorm(rnorm(nsub, .4, .1)) , # individual level parameters
         "probit.gamma" = qnorm(rnorm(nsub, .5, .1)) ,
         "probit.delta" = qnorm(rnorm(nsub, .7, .1)) , 
-        "probit.rho" = qnorm(rep(.01, nsub) ))
+        "probit.rho" = rep(0, nsub))
   } 
 
 
@@ -340,59 +331,234 @@ for (p in valid_papers) {
   # Saving parameters for each paper in data frame
   parameters_df <- rbind( parameters_df, parameters_df_paper)
   
-  #Linear regression
-  lin_model_gamma <- lm(gamma ~ avg_switchrate, 
-                        data = data_regression)
-  lin_model_delta <- lm(delta ~ avg_switchrate, 
-                        data = data_regression)
-  lin_model_alpha <- lm(alpha ~ avg_switchrate, 
-                        data_regression)
-  lin_model_rho <- lm(rho ~ avg_switchrate, 
-                        data_regression)
+  #Linear regression Gamma 
+  reg_model_gamma <- brm(gamma ~ avg_switchrate, 
+                           data = data_regression, 
+                           family = gaussian(), 
+                           prior = c(set_prior("normal(0,1)", class = "b"),
+                                     set_prior("normal(0,10)", class = "Intercept")),
+                           chains = 4, 
+                           iter = 2000, 
+                           cores = parallel::detectCores())
   
-  model_summary_gamma <-summary(lin_model_gamma)
-  coefficents_gamma <- model_summary_gamma$coefficients
+  summary(reg_model_gamma)
   
-  model_summary_delta <-summary(lin_model_delta)
-  coefficents_delta <- model_summary_delta$coefficients
+  #Linear regression Delta
+  reg_model_delta <- brm(delta ~ avg_switchrate, 
+                           data = data_regression, 
+                           family = gaussian(), 
+                           prior = c(set_prior("normal(0,1)", class = "b"),
+                                     set_prior("normal(0,10)", class = "Intercept")),
+                           chains = 4, 
+                           iter = 2000, 
+                           cores = parallel::detectCores())
   
-  model_summary_alpha<-summary(lin_model_alpha)
-  coefficents_alpha <- model_summary_alpha$coefficients
+  summary(reg_model_delta)
   
-  model_summary_rho<-summary(lin_model_rho)
-  coefficents_rho <- model_summary_rho$coefficients
+  #Linear regression Alpha
   
-  extract_single_model <- function(model, parameter, papername) {
-    coeff <- summary(model)$coefficients
-    coeff_df <- data.frame(
-      Term = rownames(coeff),
-      Estimate = coeff[, "Estimate"],
-      P_Value = coeff[, "Pr(>|t|)"]
-    )
-    # classification according to p-value significance
-    coeff_df[[paste0("Significance_", parameter)]] <- ifelse(
-      coeff_df$P_Value < 0.05, "Significant", "Not Significant"
-    )
-    # Add papername
-    coeff_df$Paper <- papername
-    # Rename columns
-    setNames(coeff_df, c("Term", 
-                         paste0("Estimate_", parameter), 
-                         paste0("P_Value_", parameter), 
-                         paste0("Significance_", parameter), 
-                         "Paper"))
-  }
-  #Extract results of each model
-  results_gamma <- extract_single_model(lin_model_gamma, "gamma", papername)
-  results_delta <- extract_single_model(lin_model_delta, "delta", papername)
-  results_alpha <- extract_single_model(lin_model_alpha, "alpha", papername)
-  results_rho <- extract_single_model(lin_model_rho, "rho", papername)
+  reg_model_alpha <- brm(alpha ~ avg_switchrate, 
+                         data = data_regression, 
+                         family = gaussian(), 
+                         prior = c(set_prior("normal(0,1)", class = "b"),
+                                   set_prior("normal(0,10)", class = "Intercept")),
+                         chains = 4, 
+                         iter = 2000, 
+                         cores = parallel::detectCores())
   
-  combined_results <- Reduce(function(x, y) merge(x, y, by = c("Term", "Paper"), all = TRUE), 
-                             list(results_gamma, results_delta, results_alpha, results_rho))
-  # Add estimates for each paper 
-  reg_results_list <- rbind(reg_results_list , combined_results)
+  summary(reg_model_alpha)
+  
+  #Linear regression Rho 
+  reg_model_rho <- brm(rho ~ avg_switchrate, 
+                         data = data_regression, 
+                         family = gaussian(), 
+                         prior = c(set_prior("normal(0,1)", class = "b"),
+                                   set_prior("normal(0,10)", class = "Intercept")),
+                         chains = 4, 
+                         iter = 2000, 
+                         cores = parallel::detectCores())
+  
+  summary(reg_model_rho)
+  
+  
+  #Store Model Summaries and create dataframe with all regression data
+  model_summary_gamma <-summary(reg_model_gamma)
+  gamma_coefficients <- as.data.frame(model_summary_gamma$fixed)
+  gamma_distributional_params <- as.data.frame(model_summary_gamma$spec_pars)
+  model_summary_delta <-summary(reg_model_delta)
+  delta_coefficients <- as.data.frame(model_summary_delta$fixed)
+  delta_distributional_params <- as.data.frame(model_summary_delta$spec_pars)
+  model_summary_alpha<-summary(reg_model_alpha)
+  alpha_coefficients <- as.data.frame(model_summary_alpha$fixed)
+  alpha_distributional_params <- as.data.frame(model_summary_alpha$spec_pars)
+  model_summary_rho <-summary(reg_model_rho)
+  rho_coefficients <- as.data.frame(model_summary_rho$fixed)
+  rho_distributional_params <- as.data.frame(model_summary_rho$spec_pars)
+  
+  
+  # Regression Data Gamma
+  gamma_coefficients <- data.frame(
+    Parameter = rownames(gamma_coefficients),
+    gamma_coefficients
+  )
+  gamma_distributional <- data.frame(
+    Parameter = "sigma",
+    gamma_distributional_params
+  )
+  gamma_data <- rbind(gamma_coefficients, gamma_distributional)
+  gamma_data$Model <- "Gamma"
+  
+  # Regression Data Delta
+  delta_coefficients <- data.frame(
+    Parameter = rownames(delta_coefficients),
+    delta_coefficients
+  )
+  delta_distributional <- data.frame(
+    Parameter = "sigma",
+    delta_distributional_params
+  )
+  delta_data <- rbind(delta_coefficients, delta_distributional)
+  delta_data$Model <- "Delta"
+  
+  # # Regression Data Alpha
+  alpha_coefficients <- data.frame(
+    Parameter = rownames(alpha_coefficients),
+    alpha_coefficients
+  )
+  alpha_distributional <- data.frame(
+    Parameter = "sigma",
+   alpha_distributional_params
+  )
+  alpha_data <- rbind(alpha_coefficients, alpha_distributional)
+  alpha_data$Model <- "Alpha"
+  
+  # # Regression Data Rho
+  rho_coefficients <- data.frame(
+    Parameter = rownames(rho_coefficients),
+    rho_coefficients
+  )
+  rho_distributional <- data.frame(
+    Parameter = "sigma",
+    rho_distributional_params
+  )
+  rho_data <- rbind(rho_coefficients, rho_distributional)
+  rho_data$Model <- "Rho"
+  
+  # Combining all parameter data 
+  combined_data <- rbind(gamma_data, delta_data, alpha_data, rho_data)
+  
+  
+  # add papername
+  combined_data$Paper <- papername
+  
+  # Fill each paper data in one data frame
+  reg_results_list <- rbind(reg_results_list, combined_data)
 }
+  
+#Plot Regression Avg Switchrate and Gamma
+gamma_reg_results_list <- reg_results_list %>% filter(Parameter=="avg_switchrate" & Model == "Gamma")
+
+
+reg_plot_gamma <- ggplot(gamma_reg_results_list, aes(x = Estimate, y = Paper)) +
+  geom_errorbarh(aes(xmin = l.95..CI, xmax = u.95..CI), 
+                 height = 0.2, color = "darkgreen") +
+  geom_point(size = 3, color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  labs(
+    title = "Linear Regression Average Switching Rate and Gamma",
+    x = "Estimate",
+    y = "Paper"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y  = element_text(size = 12),
+    axis.text.y   = element_text(size = 10),
+    axis.title.x  = element_text(size = 12),
+    axis.text.x   = element_text(size = 10),
+    plot.title    = element_text(size = 14, face = "bold", hjust = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "grey70", linetype = "dotted"),
+    panel.grid.major.y = element_blank()
+  )
+ggsave(filename = paste0("plots/LinearRegression/Gamma_Regression_", papername, ".png"), plot = reg_plot_gamma ,width = 8, height = 6, dpi = 300)
+
+#Plot Regression Avg Switchrate and Alpha
+alpha_reg_results_list <- reg_results_list %>% filter(Parameter=="avg_switchrate" & Model == "Alpha")
+
+reg_plot_alpha <- ggplot(alpha_reg_results_list, aes(x = Estimate, y = Paper)) +
+  geom_errorbarh(aes(xmin = l.95..CI, xmax = u.95..CI), 
+                 height = 0.2, color = "orange") +
+  geom_point(size = 3, color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  labs(
+    title = "Linear Regression Average Switching Rate and Alpha",
+    x = "Estimate",
+    y = "Paper"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y  = element_text(size = 12),
+    axis.text.y   = element_text(size = 10),
+    axis.title.x  = element_text(size = 12),
+    axis.text.x   = element_text(size = 10),
+    plot.title    = element_text(size = 14, face = "bold", hjust = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "grey70", linetype = "dotted"),
+    panel.grid.major.y = element_blank()
+  )
+ggsave(filename = paste0("plots/LinearRegression/Alpha_Regression_", papername, ".png"), plot = reg_plot_alpha ,width = 8, height = 6, dpi = 300)
+
+#Plot Regression Avg Switchrate and Delta
+delta_reg_results_list <- reg_results_list %>% filter(Parameter=="avg_switchrate" & Model == "Delta")
+
+reg_plot_delta <- ggplot(delta_reg_results_list, aes(x = Estimate, y = Paper)) +
+  geom_errorbarh(aes(xmin = l.95..CI, xmax = u.95..CI), 
+                 height = 0.2) +
+  geom_point(size = 3, color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  labs(
+    title = "Linear Regression Average Switching Rate and Delta",
+    x = "Estimate",
+    y = "Paper"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y  = element_text(size = 12),
+    axis.text.y   = element_text(size = 10),
+    axis.title.x  = element_text(size = 12),
+    axis.text.x   = element_text(size = 10),
+    plot.title    = element_text(size = 14, face = "bold", hjust = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "grey70", linetype = "dotted"),
+    panel.grid.major.y = element_blank()
+  )
+ggsave(filename = paste0("plots/LinearRegression/Delta_Regression_", papername, ".png"), plot = reg_plot_delta,width = 8, height = 6, dpi = 300)
+
+#Plot Regression Avg Switchrate and Rho
+rho_reg_results_list <- reg_results_list %>% filter(Parameter=="avg_switchrate" & Model == "Delta")
+
+reg_plot_rho <- ggplot(rho_reg_results_list, aes(x = Estimate, y = Paper)) +
+  geom_errorbarh(aes(xmin = l.95..CI, xmax = u.95..CI), 
+                 height = 0.2, color = "purple") +
+  geom_point(size = 3, color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  labs(
+    title = "Linear Regression Average Switching Rate and Rho",
+    x = "Estimate",
+    y = "Paper"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.title.y  = element_text(size = 12),
+    axis.text.y   = element_text(size = 10),
+    axis.title.x  = element_text(size = 12),
+    axis.text.x   = element_text(size = 10),
+    plot.title    = element_text(size = 14, face = "bold", hjust = 0.5),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "grey70", linetype = "dotted"),
+    panel.grid.major.y = element_blank()
+  )
+ggsave(filename = paste0("plots/LinearRegression/Rho_Regression_", papername, ".png"), plot = reg_plot_rho,width = 8, height = 6, dpi = 300)
 
 
 
@@ -406,7 +572,7 @@ for (p in valid_papers) {
     geom_point(size = 4, alpha = 0.8, color = "darkgreen",na.rm = TRUE) + 
     labs(
       title = paste("Gamma-Distribution:", papername),
-      subtitle = "Relationship between Gamma-Values and Switchrate",  
+      subtitle = "Relationship between Gamma-Values and Switching Rate",  
       x = "Average Switchrate",
       y = "Gamma-Values"
     ) +
@@ -429,7 +595,7 @@ for (p in valid_papers) {
     geom_point(size = 4, alpha = 0.8, color = "orange", na.rm = TRUE) +  
     labs(
       title = paste("Alpha-Distribution:", papername),
-      subtitle = "Relationship between Alpha-Values and Switchrate", 
+      subtitle = "Relationship between Alpha-Values and Switching Rate", 
       x = "Average Switchrate",
       y = "Alpha-Values"
     ) +
@@ -450,7 +616,7 @@ for (p in valid_papers) {
     geom_point(size = 4, alpha = 0.8, na.rm = TRUE) +  
     labs(
       title = paste("Delta-Distribution:", papername),
-      subtitle = "Relationship between Delta-Values and Switchrate",  
+      subtitle = "Relationship between Delta-Values and Switching Rate",  
       x = "Average Switchrate",
       y = "Delta-Values"
     ) +
@@ -471,7 +637,7 @@ for (p in valid_papers) {
     geom_point(size = 4, alpha = 0.8, color = "purple",na.rm = TRUE) + 
     labs(
       title = paste("Rho-Distribution:", papername),
-      subtitle = "Relationship between Rho-Values and Switchrate",  
+      subtitle = "Relationship between Rho-Values and Switching Rate",  
       x = "Average Switchrate",
       y = "Rho-Values"
     ) +
@@ -493,6 +659,23 @@ for (p in valid_papers) {
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##Backup Regression
 #Process Regression data (exclude intercept from dataframe)
 reg_results_list <- reg_results_list %>% filter(Term=="avg_switchrate")
 
@@ -523,7 +706,7 @@ reg_plot_delta <- ggplot(reg_results_list, aes(x = Estimate_delta, y = Paper, co
   # Add horizontal grid lines 
   theme(panel.grid.major.y = element_line(color = "gray80", linetype = "dashed"))
 
-ggsave(filename = paste0("plots/LinearRegression/Delta_Regression_", papername, ".png"), plot = reg_plot_delta,width = 8, height = 6, dpi = 300)
+
 
 ##### Linear Regression Alpha and Average Switchrate
 reg_plot_alpha <- ggplot(reg_results_list, aes(x = Estimate_alpha, y = Paper, color = Significance_alpha)) +
@@ -624,6 +807,25 @@ ggsave(filename = paste0("plots/LinearRegression/Rho_Regression_", papername, ".
 
 
 ###Backup
+anyNA(data_list$HA)
+anyNA(data_list$LA)
+anyNA(data_list$HB)
+anyNA(data_list$LB)
+anyNA(data_list$sprobHA)
+anyNA(data_list$sprobLA)
+anyNA(data_list$sprobHB)
+anyNA(data_list$sprobLB)
+anyNA(data_list$nsub)
+anyNA(data_list$nprob)
+anyNA(data_list$choice)
+summary(data_list)
+
+
+# Check for invalid probability values
+range(data_list$HA, na.rm = TRUE) # Should be within 0-1
+
+# Validate dimensions of data_array
+dim(data_array)
 
 ## Gamma Distribution across switchrate
 ggplot(parameters_plot_data, aes(x = avg_switchrate, y = gamma,)) +
