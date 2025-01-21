@@ -47,24 +47,39 @@ for (p in valid_papers) {
   paper <- read_rds(glue("data/PreprocessedPaperData/cpt_{p}.rds.bz2"))
   papername <- unique(paper$paper)
 
+  #sort Subject then Gain then loss problems
+  paper_sorted <- paper[order(paper$subject, paper$dom), ] %>%
+  group_by(subject) %>%
+    mutate(
+      nGain = sum(dom == "Gain"),
+      nLoss = sum(dom == "Loss"))
+  
+  #nGain Vector
+  nGain_vector <- paper_sorted %>%
+    distinct(subject, nGain) %>%  
+    pull(nGain) 
+
+  
+  
   #Get vector of the number of solved problems per participant
-  nsolvedprob <- paper %>% 
+  nsolvedprob <- paper_sorted %>% 
     group_by(subject) %>% 
     summarise(nsolvedprob = n()) 
 
   nsolvedprob <- nsolvedprob$nsolvedprob
 
   #Create a list of subject and the respective switch rate
-  switch_rate_data <- paper %>%
-    select(paper, subject, cat_switch, avg_switchrate) %>% 
+  switch_rate_data <- paper_sorted %>%
+    select(paper, problem,subject, cat_switch, avg_switchrate,dom) %>% 
     distinct() 
+    
 
   switch_rate_data$subject <- seq_len(nrow(switch_rate_data))
   median(switch_rate_data$avg_switchrate)
   ## create data object for JAGS
   # create Array 
 
-  preArrayData <- subset(paper, select = - c(index, problem,id))
+  preArrayData <- subset(paper_sorted, select = - c(index, problem,id))
 
   preArrayData <- preArrayData %>%
     select(-paper, paper)
@@ -76,7 +91,7 @@ for (p in valid_papers) {
   nprob <- nrow(problems) 
 
   #Get number of subjects
-  nsub <-length(unique(paper$subject)) 
+  nsub <-length(unique(paper_sorted$subject)) 
 
   #number of columns without subject
   num_cols <- ncol(preArrayData) - 1 
@@ -92,7 +107,10 @@ for (p in valid_papers) {
 
   # check dimension
   dim(data_array)
-
+  
+  data_array$nGain
+  
+  
   # Converge array in list again to have NAs in the end of each element vector
   # Due to control variable in model code the NAs won't be taken into account
 
@@ -100,7 +118,8 @@ for (p in valid_papers) {
 
   data_list <- list(
     nprob = nsolvedprob,          
-    nsub =nsub,           
+    nsub =nsub,   
+    nGain = nGain_vector,
     HA = apply(t(data_array[, 1, ]),2, as.numeric), 
     LA = apply(t(data_array[, 3, ]),2, as.numeric), 
     HB = apply(t(data_array[, 5, ]),2, as.numeric),
@@ -109,12 +128,14 @@ for (p in valid_papers) {
     sprobLA = apply(t(data_array[, 4, ]),2, as.numeric),
     sprobHB = apply(t(data_array[, 6, ]),2, as.numeric),
     sprobLB = apply(t(data_array[, 8, ]),2, as.numeric),  
-    choice = apply(t(data_array[, 9, ]) ,2, as.numeric)
+    choice = apply(t(data_array[, 9, ]) ,2, as.numeric),
+    dom = apply(t(data_array[, 11, ]), 2, as.character)
   )
+ 
 
   ## fitting ------------------------------------------------------------
 
-  params <- c("mu.alpha", "alpha", "mu.gamma", "gamma", "mu.delta", "delta", "mu.rho", "rho") # fitted parameters that should be shown in the results
+  params <- c("mu.alpha", "alpha", "mu.gamma", "gamma", "mu.delta", "delta", "mu.rho", "rho", "mu.lambda", "lambda") # fitted parameters that should be shown in the results
 
   # function for creating parameter values to initialize the MCMC chains with
   # when rnorm(1, .4, .1), then .4 is the initial value for the parameter on the desired scale
@@ -123,11 +144,13 @@ for (p in valid_papers) {
     list("mu.probit.alpha" = qnorm(rnorm(1, .4, .1)) , # hyper parameters (mu. prefix refers to  group level)
          "mu.probit.gamma" = qnorm(rnorm(1, .5, .1)) ,
          "mu.probit.delta" = qnorm(rnorm(1, .7, .1)) , 
-        "mu.probit.rho" = 0,  
+         "mu.probit.rho" = qnorm(.01) , 
+        "mu.probit.lambda" = qnorm(rnorm(1, .4, .1)),
         "probit.alpha" = qnorm(rnorm(nsub, .4, .1)) , # individual level parameters
         "probit.gamma" = qnorm(rnorm(nsub, .5, .1)) ,
         "probit.delta" = qnorm(rnorm(nsub, .7, .1)) , 
-        "probit.rho" = rep(0, nsub))
+        "probit.rho" = qnorm(rep(.01, nsub)) ,
+        "probit.lambda" = qnorm(rnorm(nsub, .4, .1))) 
   } 
 
 
@@ -138,7 +161,7 @@ for (p in valid_papers) {
     data = data_list , # data list
     inits = params_init , # creates list of initial values for each chain
     parameters.to.save = params , 
-    model.file = "code/models/CPT_hierarchical_array.txt" , # model code, see file
+    model.file = "code/models/CPT_hierarchical_array_Loss_Gain.txt" , # model code, see file
     n.chains = 6 , # number of MCMC chains
     n.iter = 2000 , # number of iterations (should be set much higher once it's clear that the model works)
     n.burnin = 1000 , # first 1000 samples of each chain are discarded
@@ -151,7 +174,11 @@ for (p in valid_papers) {
   # sanity check 2
   data_list$sprobHA+data_list$sprobLA
   data_list$sprobHB+data_list$sprobLB
-  
+  print(data_list$sprobHA[29,1])
+  print(data_list$sprobLA[29,1])
+  init_values <- params_init()
+  print(init_values$probit.delta)
+  print(init_values$probit.gamma)
 
 
   ## store results -----------------------------------------------------------------

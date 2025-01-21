@@ -48,18 +48,18 @@ model{
 	    
 	    # decision weights                                          #High and Low Switch
 	    piLA[j,i] <- (delta[j] * (pow(sprobHA[j,i], gamma[j]))) / (delta[j] * (pow(sprobHA[j,i], gamma[j])) + pow(sprobLA[j,i], gamma[j]))
-	    piHA[j,i] <- 1-piHA[j,i]
+	    piHA[j,i] <- 1-piLA[j,i]
 	
 	    piLB[j,i] <- (delta[j] * (pow(sprobHB[j,i], gamma[j]))) / (delta[j] * (pow(sprobHB[j,i], gamma[j])) + pow(sprobLB[j,i], gamma[j]))
-	    piHB[j,i] <- 1-piHB[j,i]
+	    piHB[j,i] <- 1-piLB[j,i]
 	    
 	    VA[j,i]  <- piHA[j,i] * vHA[j,i] + piLA[j,i] * vLA[j,i]
 	    VB[j,i]  <- piHB[j,i] * vHB[j,i] + piLB[j,i] * vLB[j,i]
 
 	    # rescaling valuations (cf. Krefeld-Schwalb et al., 2021; Stewart et al., 2018)
 
-	    reVA[j,i] <- pow(VA[j,i], (1/alpha[j]))
-	    reVB[j,i] <- pow(VB[j,i], (1/alpha[j]))
+	    reVA[j,i] <- lambda[j]*(-1) * pow((-1*VA[j,i]), alpha[j]) 
+	    reVB[j,i] <- lambda[j]*(-1) * pow((-1*VB[j,i]), alpha[j]) 
 
 	    # softmax choice rule
 
