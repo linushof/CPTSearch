@@ -38,9 +38,9 @@ parameters_df <- data.frame(
 
 # Constitute valid papers ------------------------------------------------------------
 valid_papers <- c("Gloeckner12", "Ungemach09", "Rakow08", "noguchi15","hertwig04")
-valid_papers <- c("noguchi15")
-valid_papers <- c("Kellen16")
-paper <- read_rds(glue("data/PreprocessedPaperData/cpt_noguchi15.rds.bz2"))
+valid_papers <- c("Gloeckner12")
+valid_papers <- c("Ungemach09")
+paper <- read_rds(glue("data/PreprocessedPaperData/cpt_rakow08.rds.bz2"))
 
 #Loop across all papers using JAGS + Generate Estimates + Regression
 for (p in valid_papers) {
@@ -162,7 +162,7 @@ for (p in valid_papers) {
     inits = params_init , # creates list of initial values for each chain
     parameters.to.save = params , 
     model.file = "code/models/CPT_hierarchical_array_Loss_Gain.txt" , # model code, see file
-    n.chains = 6 , # number of MCMC chains
+    n.chains = 4 , # number of MCMC chains
     n.iter = 2000 , # number of iterations (should be set much higher once it's clear that the model works)
     n.burnin = 1000 , # first 1000 samples of each chain are discarded
     n.thin = 1 , # with 1, every sample is stored, with 2, every 2nd sample is stored, ... to reduce autocorrelatons, use higher values. however, higher values require more iterations
@@ -210,9 +210,9 @@ for (p in valid_papers) {
 
   ## weighting function for group level
   mu.fits <- fits %>% 
-    filter(parameter %in% c("mu.alpha", "mu.gamma", "mu.delta", "mu.rho")) %>% 
+    filter(parameter %in% c("mu.alpha", "mu.gamma", "mu.delta", "mu.rho", "mu.lambda")) %>% 
     mutate(subject = 0, 
-         parameter = c("alpha", "delta", "gamma", "rho")) 
+         parameter = c("alpha", "delta", "gamma", "rho", "lambda")) 
 
   mu.weights <- mu.fits %>% 
    select(subject, parameter, mean) %>% 
@@ -223,9 +223,9 @@ for (p in valid_papers) {
 
   ## weighting function for individual level
     ind.fits <- fits %>% 
-    filter(! parameter %in% c("mu.alpha", "mu.gamma", "mu.delta", "mu.rho", "deviance")) %>% 
-    mutate(subject = rep(1:nsub, 4),
-           parameter = c(rep("alpha", nsub), rep("delta", nsub),  rep("gamma", nsub), rep("rho", nsub))
+    filter(! parameter %in% c("mu.alpha", "mu.gamma", "mu.delta", "mu.rho", "mu.lambda", "deviance")) %>% 
+    mutate(subject = rep(1:nsub, 5),
+           parameter = c(rep("alpha", nsub), rep("delta", nsub),  rep("gamma", nsub), rep("rho", nsub), rep("lambda", nsub))
     )
 
   ind.weights <- ind.fits %>%
