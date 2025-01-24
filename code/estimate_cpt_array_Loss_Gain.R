@@ -5,6 +5,9 @@ pacman::p_load(tidyverse, R2jags)
 library(viridis)
 library(glue)
 library(tools)
+library(brms)
+library(abind)
+library(coda)
 
 # Initialization of regression and parameter plot data frames ------------------------------------------------------------
 
@@ -38,9 +41,11 @@ parameters_df <- data.frame(
 
 # Constitute valid papers ------------------------------------------------------------
 valid_papers <- c("Gloeckner12", "Ungemach09", "Rakow08", "noguchi15","hertwig04")
-valid_papers <- c("Gloeckner12")
-valid_papers <- c("Ungemach09")
-paper <- read_rds(glue("data/PreprocessedPaperData/cpt_rakow08.rds.bz2"))
+
+#Single Test 
+#valid_papers <- c("Gloeckner12")
+#valid_papers <- c("Ungemach09")
+#paper <- read_rds(glue("data/PreprocessedPaperData/cpt_rakow08.rds.bz2"))
 
 #Loop across all papers using JAGS + Generate Estimates + Regression
 for (p in valid_papers) {
@@ -54,12 +59,10 @@ for (p in valid_papers) {
       nGain = sum(dom == "Gain"),
       nLoss = sum(dom == "Loss"))
   
-  #nGain Vector
+  #nGain Vector to iterate through model code
   nGain_vector <- paper_sorted %>%
     distinct(subject, nGain) %>%  
     pull(nGain) 
-
-  
   
   #Get vector of the number of solved problems per participant
   nsolvedprob <- paper_sorted %>% 
@@ -73,12 +76,11 @@ for (p in valid_papers) {
     select(paper, problem,subject, cat_switch, avg_switchrate,dom) %>% 
     distinct() 
     
-
   switch_rate_data$subject <- seq_len(nrow(switch_rate_data))
-  median(switch_rate_data$avg_switchrate)
+  
+  
   ## create data object for JAGS
   # create Array 
-
   preArrayData <- subset(paper_sorted, select = - c(index, problem,id))
 
   preArrayData <- preArrayData %>%
@@ -86,17 +88,17 @@ for (p in valid_papers) {
 
   split_data <- split(preArrayData, preArrayData$subject)
 
-  #Get max number of problems 
+  #get max number of problems 
   problems <- paper %>% distinct(problem) 
   nprob <- nrow(problems) 
 
-  #Get number of subjects
+  #get number of subjects
   nsub <-length(unique(paper_sorted$subject)) 
 
   #number of columns without subject
   num_cols <- ncol(preArrayData) - 1 
 
-  # initiate Array
+  #initiate Array
   data_array <- array(NA, dim = c(nprob, num_cols, nsub))
 
   # fill 3D-Array
@@ -107,9 +109,7 @@ for (p in valid_papers) {
 
   # check dimension
   dim(data_array)
-  
-  data_array$nGain
-  
+
   
   # Converge array in list again to have NAs in the end of each element vector
   # Due to control variable in model code the NAs won't be taken into account
@@ -157,7 +157,6 @@ for (p in valid_papers) {
   # run JAGS model
 
   mfit <- jags.parallel(
-  
     data = data_list , # data list
     inits = params_init , # creates list of initial values for each chain
     parameters.to.save = params , 
@@ -174,12 +173,6 @@ for (p in valid_papers) {
   # sanity check 2
   data_list$sprobHA+data_list$sprobLA
   data_list$sprobHB+data_list$sprobLB
-  print(data_list$sprobHA[29,1])
-  print(data_list$sprobLA[29,1])
-  init_values <- params_init()
-  print(init_values$probit.delta)
-  print(init_values$probit.gamma)
-
 
   ## store results -----------------------------------------------------------------
 
@@ -202,7 +195,6 @@ for (p in valid_papers) {
     pivot_wider(names_from = param_name, values_from = mean)              
 
   # summary of posterior distributions
-
   fits <- mfit$BUGSoutput$summary %>% round(4) %>%  as_tibble(rownames = "parameter")
 
 
@@ -237,95 +229,8 @@ for (p in valid_papers) {
 
   ind.weights <- left_join(ind.weights, switch_rate_data, by = "subject")
 
-  #Weighted Probability plots
-  median_switch_rate <- median(ind.weights$avg_switchrate, na.rm = TRUE)
-  prob_weight_plot <- mu.weights %>% 
-    ggplot(aes(p, w)) +
-    scale_x_continuous(
-      breaks = seq(0, 1, by = 0.25), 
-      labels = scales::number_format(accuracy = 0.01)
-    ) +
-    scale_y_continuous(
-      breaks = seq(0, 1, by = 0.25),
-      labels = scales::number_format(accuracy = 0.01) 
-    ) +
-    labs(
-      title = papername,
-      x = "p",
-      y = "w(p)"
-    ) +
-    geom_line(data = ind.weights, aes(group = subject, color = avg_switchrate), alpha = 0.8) +
-    scale_color_viridis_c(
-      option = "plasma",  
-      name = "Average Switching Rate",  
-      breaks = c(0, 0.25, 0.5, 0.75, 1),  
-      labels = scales::number_format(accuracy = 0.01),
-      limits = c(0, 1) 
-    ) +
-    geom_abline(intercept = 0, slope = 1, linewidth = 1, color = "black", linetype = "dashed") +
-    geom_line(linewidth = 1.2, color = "black") +
-    theme_classic(base_size = 14) +
-    theme(
-      plot.title = element_text(size = 20, face = "bold", hjust = 0.5, color = "black"),
-      axis.text = element_text(color = "black"),
-      axis.title = element_text(color = "black"),
-      legend.position = "bottom",  
-      legend.direction = "horizontal",  
-      legend.box = "horizontal",  
-      legend.title.align = 0.5, 
-      legend.text = element_text(size = 10, color = "black"),  
-      legend.title = element_text(size = 12, face = "plain", hjust = 0.5, vjust =0.8),  
-      legend.key.width = unit(2, "cm"),  
-      legend.spacing.y = unit(2.5, "cm"),  
-      panel.background = element_rect(fill = "white", color = NA), 
-      plot.background = element_rect(fill = "white", color = NA) ,
-    )
-  
-  
-  
-  
-  
-  prob_weight_plot <- mu.weights %>% 
-    ggplot(aes(p, w)) +
-    scale_x_continuous(
-      breaks = seq(0, 1, by = 0.25), 
-      labels = scales::number_format(accuracy = 0.01)
-    ) +
-    scale_y_continuous(
-      breaks = seq(0, 1, by = 0.25),
-      labels = scales::number_format(accuracy = 0.01) 
-    ) +
-    labs(
-      title = papername,
-      x = "p",
-      y = "w(p)"
-    ) +
-    geom_line(data = ind.weights, aes(group = subject), linewidth = 0.4, color = "black") + # Thinner lines
-    geom_abline(intercept = 0, slope = 1, linewidth = 1, color = "black", linetype = "dashed") +
-    theme_classic(base_size = 14) +
-    theme(
-      plot.title = element_text(size = 20, face = "bold", hjust = 0.5, color = "black"),
-      axis.text = element_text(color = "black"),
-      axis.title = element_text(color = "black"),
-      legend.position = "bottom",  
-      legend.direction = "horizontal",  
-      legend.box = "horizontal",  
-      legend.title.align = 0.5, 
-      legend.text = element_text(size = 10, color = "black"),  
-      legend.title = element_text(size = 12, face = "plain", hjust = 0.5, vjust =0.8),  
-      legend.key.width = unit(2, "cm"),  
-      legend.spacing.y = unit(2.5, "cm"),  
-      panel.background = element_rect(fill = "white", color = NA), 
-      plot.background = element_rect(fill = "white", color = NA)
-    )
-  
-  
-  
-  
-  
   # Calculation median switching rate
   median_switch_rate <- median(ind.weights$avg_switchrate, na.rm = TRUE)
-
 
   # Plot with median switching rate
   prob_weight_plot <- mu.weights %>% 
@@ -379,7 +284,6 @@ for (p in valid_papers) {
   ggsave(filename = paste0("plots/ProbWeighting/ProbWeighting_", papername, ".png"), plot = prob_weight_plot)
 
   #regression data preparations
-
   data_regression <- fits %>%
     mutate(
       subject = as.integer(str_extract(parameter, "\\d+")), 
@@ -605,7 +509,7 @@ reg_plot_delta <- ggplot(delta_reg_results_list, aes(x = Estimate, y = Paper)) +
 ggsave(filename = paste0("plots/LinearRegression/Delta_Regression_", papername, ".png"), plot = reg_plot_delta,width = 8, height = 6, dpi = 300)
 
 #Plot Regression Avg Switchrate and Rho
-rho_reg_results_list <- reg_results_list %>% filter(Parameter=="avg_switchrate" & Model == "Delta")
+rho_reg_results_list <- reg_results_list %>% filter(Parameter=="avg_switchrate" & Model == "Rho")
 
 reg_plot_rho <- ggplot(rho_reg_results_list, aes(x = Estimate, y = Paper)) +
   geom_errorbarh(aes(xmin = l.95..CI, xmax = u.95..CI), 
@@ -631,7 +535,7 @@ reg_plot_rho <- ggplot(rho_reg_results_list, aes(x = Estimate, y = Paper)) +
 ggsave(filename = paste0("plots/LinearRegression/Rho_Regression_", papername, ".png"), plot = reg_plot_rho,width = 8, height = 6, dpi = 300)
 
 
-
+#Loop parameter/avg switching rate for each paper
 for (p in valid_papers) {
   papername <- toTitleCase(p)
   
@@ -659,7 +563,7 @@ for (p in valid_papers) {
   
  
   
-  ggsave(filename = paste0("plots/ParameterDistribution/Gamma_Distribution_", papername, ".png"), plot = plot,width = 8, height = 6, dpi = 300)
+ ggsave(filename = paste0("plots/ParameterDistribution/Gamma_Distribution_", papername, ".png"), plot = plot,width = 8, height = 6, dpi = 300)
   
   plot <- ggplot(plot_data, aes(x = avg_switchrate, y = alpha)) +
     geom_point(size = 4, alpha = 0.8, color = "orange", na.rm = TRUE) +  
@@ -724,422 +628,7 @@ for (p in valid_papers) {
   
   
   
-  ggsave(filename = paste0("plots/ParameterDistribution/Rho_Distribution_", papername, ".png"), plot = plot,width = 8, height = 6, dpi = 300)
+    ggsave(filename = paste0("plots/ParameterDistribution/Rho_Distribution_", papername, ".png"), plot = plot,width = 8, height = 6, dpi = 300)
   
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-##Backup Regression
-#Process Regression data (exclude intercept from dataframe)
-reg_results_list <- reg_results_list %>% filter(Term=="avg_switchrate")
-
-###### Linear Regression Delta and Average Switchrate
-reg_plot_delta <- ggplot(reg_results_list, aes(x = Estimate_delta, y = Paper, color = Significance_delta)) +
-  geom_point(size = 6, alpha = 0.8) + 
-  scale_color_manual(values = c("Significant" = "#E63946", "Not Significant" = "#457B9D")) + 
-  theme_minimal(base_size = 14) +  
-  labs(
-    title = "Linear Regression Delta-Values and Average Switchrate",  
-    subtitle = "Significance of Papers' Delta-Values",               
-    x = "Estimate", 
-    y = "Paper", 
-    color = "Significance"                                           
-  ) +
-  # Customize axis text
-  theme(
-    axis.text.y = element_text(size = 14, color = "black", face = "bold"),
-    axis.text.x = element_text(size = 12, color = "black"),
-    axis.title = element_text(size = 16, face = "bold"),
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),  # Center title
-    plot.subtitle = element_text(size = 14, hjust = 0.5, color = "gray40"),
-    legend.position = "right",                                       # Move legend to right
-    legend.text = element_text(size = 12)
-  ) +
-  # Add a dashed vertical line at 0 
-  geom_vline(xintercept = 0, linetype = "dashed", color = "darkgray", size = 1.2) +
-  # Add horizontal grid lines 
-  theme(panel.grid.major.y = element_line(color = "gray80", linetype = "dashed"))
-
-
-
-##### Linear Regression Alpha and Average Switchrate
-reg_plot_alpha <- ggplot(reg_results_list, aes(x = Estimate_alpha, y = Paper, color = Significance_alpha)) +
-  geom_point(size = 6, alpha = 0.8) + 
-  scale_color_manual(values = c("Significant" = "#E63946", "Not Significant" = "#457B9D")) + 
-  theme_minimal(base_size = 14) +  
-  labs(
-    title = "Linear Regression Alpha-Values and Average Switchrate", 
-    subtitle = "Significance of Papers' Alpha-Values",              
-    x = "Estimate", 
-    y = "Paper", 
-    color = "Significance"                                          
-  ) +
-  # Customize axis text
-  theme(
-    axis.text.y = element_text(size = 14, color = "black", face = "bold"),
-    axis.text.x = element_text(size = 12, color = "black"),
-    axis.title = element_text(size = 16, face = "bold"),
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),  # Center title
-    plot.subtitle = element_text(size = 14, hjust = 0.5, color = "gray40"),
-    legend.position = "right",                                       # Move legend to right
-    legend.text = element_text(size = 12)
-  ) +
-  # Add a dashed vertical line at 0 
-  geom_vline(xintercept = 0, linetype = "dashed", color = "darkgray", size = 1.2) +
-  # Add horizontal grid lines
-  theme(panel.grid.major.y = element_line(color = "gray80", linetype = "dashed"))
-
-ggsave(filename = paste0("plots/LinearRegression/Alpha_Regression_", papername, ".png"), plot = reg_plot_alpha ,width = 8, height = 6, dpi = 300)
-
-
-
-
-
-###### Linear Regression Gamma and Average Switchrate
-reg_plot_gamma <- ggplot(reg_results_list, aes(x = Estimate_gamma, y = Paper, color = Significance_gamma)) +
-  geom_point(size = 6, alpha = 0.8) + 
-  scale_color_manual(values = c("Significant" = "#E63946", "Not Significant" = "#457B9D")) + 
-  theme_minimal(base_size = 14) +  
-  labs(
-    title = "Linear Regression Gamma-Values and Average Switchrate", 
-    subtitle = "Significance of Papers' Gamma-Values",              
-    x = "Estimate", 
-    y = "Paper", 
-    color = "Significance"                                           
-  ) +
-  # Customize axis text
-  theme(
-    axis.text.y = element_text(size = 14, color = "black", face = "bold"),
-    axis.text.x = element_text(size = 12, color = "black"),
-    axis.title = element_text(size = 16, face = "bold"),
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),  # Center title
-    plot.subtitle = element_text(size = 14, hjust = 0.5, color = "gray40"),
-    legend.position = "right",                                       # Move legend to right
-    legend.text = element_text(size = 12)
-  ) +
-  # Add a dashed vertical line at 0 
-  geom_vline(xintercept = 0, linetype = "dashed", color = "darkgray", size = 1.2) +
-  # Add horizontal grid lines 
-  theme(panel.grid.major.y = element_line(color = "gray80", linetype = "dashed"))
-
-ggsave(filename = paste0("plots/LinearRegression/Gamma_Regression_", papername, ".png"), plot = reg_plot_gamma ,width = 8, height = 6, dpi = 300)
-
-reg_plot_rho <- ggplot(reg_results_list, aes(x = Estimate_rho, y = Paper, color = Significance_rho)) +
-  geom_point(size = 6, alpha = 0.8) + 
-  scale_color_manual(values = c("Significant" = "#E63946", "Not Significant" = "#457B9D")) + 
-  theme_minimal(base_size = 14) +  
-  labs(
-    title = "Linear Regression Rho-Values and Average Switchrate",  
-    subtitle = "Significance of Papers' Rho-Values",               
-    x = "Estimate", 
-    y = "Paper", 
-    color = "Significance"                                           
-  ) +
-  # Customize axis text
-  theme(
-    axis.text.y = element_text(size = 14, color = "black", face = "bold"),
-    axis.text.x = element_text(size = 12, color = "black"),
-    axis.title = element_text(size = 16, face = "bold"),
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),  # Center title
-    plot.subtitle = element_text(size = 14, hjust = 0.5, color = "gray40"),
-    legend.position = "right",                                       # Move legend to right
-    legend.text = element_text(size = 12)
-  ) +
-  # Add a dashed vertical line at 0 
-  geom_vline(xintercept = 0, linetype = "dashed", color = "darkgray", size = 1.2) +
-  # Add horizontal grid lines 
-  theme(panel.grid.major.y = element_line(color = "gray80", linetype = "dashed"))
-
-ggsave(filename = paste0("plots/LinearRegression/Rho_Regression_", papername, ".png"), plot = reg_plot_rho,width = 8, height = 6, dpi = 300)
-
-
-
-
-
-
-
-
-
-###Backup
-anyNA(data_list$HA)
-anyNA(data_list$LA)
-anyNA(data_list$HB)
-anyNA(data_list$LB)
-anyNA(data_list$sprobHA)
-anyNA(data_list$sprobLA)
-anyNA(data_list$sprobHB)
-anyNA(data_list$sprobLB)
-anyNA(data_list$nsub)
-anyNA(data_list$nprob)
-anyNA(data_list$choice)
-summary(data_list)
-
-
-# Check for invalid probability values
-range(data_list$HA, na.rm = TRUE) # Should be within 0-1
-
-# Validate dimensions of data_array
-dim(data_array)
-
-## Gamma Distribution across switchrate
-ggplot(parameters_plot_data, aes(x = avg_switchrate, y = gamma,)) +
-  geom_point(size = 4, alpha = 0.8, color = "#1D3557", na.rm = TRUE) +  # Use a modern color
-  labs(
-    title = paste("Gamma-Distribution:", papername),
-    subtitle = "Relationship between Gamma-Values and Switchrate",  # Add subtitle
-    x = "Average Switchrate",
-    y = "Gamma-Values",
-  ) +
-  theme_minimal(base_size = 14) +  # Clean theme
-  theme(
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),  # Center title
-    plot.subtitle = element_text(size = 14, hjust = 0.5, color = "gray50"),
-    axis.text = element_text(size = 12),
-    axis.title = element_text(size = 14, face = "bold"),
-    panel.grid.major = element_line(color = "gray90"),
-    panel.grid.minor = element_blank(),
-  ) +
-  geom_smooth(method = "lm", se = FALSE, linetype = "dotted", color = "darkred")  # Add trendline
-
-ggplot(data_regression, aes(x = avg_switchrate, y = gamma)) +
-  geom_point(size = 4, alpha = 0.8, color = "#1D3557", na.rm = TRUE) +  # Use a modern color
-  labs(
-    title = paste("Gamma-Distribution:", papername),
-    subtitle = "Relationship between Gamma-Values and Switchrate",  # Add subtitle
-    x = "Average Switchrate",
-    y = "Gamma-Values"
-  ) +
-  theme_minimal(base_size = 14) +  # Clean theme
-  theme(
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),  # Center title
-    plot.subtitle = element_text(size = 14, hjust = 0.5, color = "gray50"),
-    axis.text = element_text(size = 12),
-    axis.title = element_text(size = 14, face = "bold"),
-    panel.grid.major = element_line(color = "gray90"),
-    panel.grid.minor = element_blank()
-  ) +
-  geom_smooth(method = "lm", se = FALSE, linetype = "dotted", color = "darkred")  # Add trendline
-
-## Alpha Distribution across switchrate
-ggplot(data_regression, aes(x = avg_switchrate, y = alpha)) +
-  geom_point(size = 4, alpha = 0.8, color = "#1D3557", na.rm = TRUE) +  # Use a modern color
-  labs(
-    title = paste("Alpha-Distribution:", papername),
-    subtitle = "Relationship between Alpha-Values and Switchrate",  # Add subtitle
-    x = "Average Switchrate",
-    y = "Alpha-Values"
-  ) +
-  theme_minimal(base_size = 14) +  # Clean theme
-  theme(
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),  # Center title
-    plot.subtitle = element_text(size = 14, hjust = 0.5, color = "gray50"),
-    axis.text = element_text(size = 12),
-    axis.title = element_text(size = 14, face = "bold"),
-    panel.grid.major = element_line(color = "gray90"),
-    panel.grid.minor = element_blank()
-  ) +
-  geom_smooth(method = "lm", se = FALSE, linetype = "dotted", color = "darkred")  # Add trendline
-
-
-## Delta Distribution across switchrate
-ggplot(data_regression, aes(x = avg_switchrate, y = delta)) +
-  geom_point(size = 4, alpha = 0.8, color = "#1D3557", na.rm = TRUE) +  # Use a modern color
-  labs(
-    title = paste("Delta-Distribution:", papername),
-    subtitle = "Relationship between Delta-Values and Switchrate",  # Add subtitle
-    x = "Average Switchrate",
-    y = "Delta-Values"
-  ) +
-  theme_minimal(base_size = 14) +  # Clean theme
-  theme(
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),  # Center title
-    plot.subtitle = element_text(size = 14, hjust = 0.5, color = "gray50"),
-    axis.text = element_text(size = 12),
-    axis.title = element_text(size = 14, face = "bold"),
-    panel.grid.major = element_line(color = "gray90"),
-    panel.grid.minor = element_blank()
-  ) +
-  geom_smooth(method = "lm", se = FALSE, linetype = "dotted", color = "darkred")  # Add trendline
-
-
-
-
-# Ensure no NAs in critical data
-anyNA(data_list$HA)
-anyNA(data_list$choice)
-
-# Check for invalid probability values
-range(data_list$HA, na.rm = TRUE) # Should be within 0-1
-
-# Validate dimensions of data_array
-dim(data_array)
-
-# Inspect the problematic node's data
-data_array[5, 14,3] # 52nd problem for the 6th subject
-
-#Distribution Gamma
-#Logistic Regression
-logit_model <- glm(cat_switch ~ gamma + delta, 
-                   data = data_regression, 
-                   family = binomial)
-summary(logit_model)
-
-exp(coef(logit_model))
-pR2(logit_model)
-
-#Linear Regression
-lin_model_gamma <- lm(gamma ~ avg_switchrate, 
-                      data = data_regression)
-lin_model_delta <- lm(delta ~ avg_switchrate, 
-                      data = data_regression)
-lin_model_alpha <- lm(alpha ~ avg_switchrate, 
-                      data_regression)
-
-
-#Summary
-summary(lin_model_gamma)
-summary(lin_model_delta)
-summary(lin_model_alpha)$coefficients
-
-
-# Plot alpha values across papers
-ggplot(parameters_df, aes(x = paper, y = alpha)) +
-  geom_point(size = 4, color = "skyblue") +  
-  labs(
-    title = "alpha values across papers",
-    x = "Paper",
-    y = "Alpha"
-  ) +
-  theme_minimal() +  
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1), 
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),  
-    axis.title = element_text(size = 14),  
-    axis.text = element_text(size = 12)  
-  )
-
-# Plot gamma values across papers
-ggplot(parameters_df, aes(x = paper, y = gamma)) +
-  geom_point(size = 4, color = "skyblue") +  
-  labs(
-    title = "gamma values across papers",
-    x = "Paper",
-    y = "Gamma"
-  ) +
-  theme_minimal() +  
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1), 
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),  
-    axis.title = element_text(size = 14),  
-    axis.text = element_text(size = 12)  
-  )
-
-# Plot rho values across papers
-ggplot(parameters_df, aes(x = paper, y = rho)) +
-  geom_point(size = 4, color = "skyblue") +  
-  labs(
-    title = "rho values across papers",
-    x = "Paper",
-    y = "Rho"
-  ) +
-  theme_minimal() +  
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1), 
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),  
-    axis.title = element_text(size = 14),  
-    axis.text = element_text(size = 12)  
-  )
-
-# Plot delta values across papers
-ggplot(parameters_df, aes(x = paper, y = delta)) +
-  geom_point(size = 4, color = "skyblue") +  
-  labs(
-    title = "delta values across papers",
-    x = "Paper",
-    y = "Delta"
-  ) +
-  theme_minimal() +  
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1), 
-    plot.title = element_text(size = 16, face = "bold", hjust = 0.5),  
-    axis.title = element_text(size = 14),  
-    axis.text = element_text(size = 12)  
-  )
-
-###Optional 
-ggplot(data_regression, aes(x = avg_switchrate, y = alpha, color = paper)) +
-  geom_point(size = 3,na.rm = TRUE) +  
-  labs(title = "Alpha-Wert vs. Average Switchrate",
-       x = "Average Switchrate",
-       y = "Alpha-Values",
-       color = "Paper") +  
-  theme_light() 
-
-ggplot(data_regression, aes(x = avg_switchrate, y = delta, color = paper)) +
-  geom_point(size = 3,na.rm = TRUE) +  
-  labs(title = "Delta-Wert vs. Average Switchrate",
-       x = "Average Switchrate",
-       y = "Delta-Values",
-       color = "Paper") +  
-  theme_light()  
-
-ggplot(data_regression, aes(x = avg_switchrate, y = gamma)) +
-  geom_point(size = 3,na.rm = TRUE) +  
-  labs(title = paste("Alpha-Distribution", papername),
-       x = "Average Switchrate",
-       y = "Gamma-Values")+
-  theme_light() 
-
-
-###Optional plot idea Delta Distribution across switchrate
-ggplot(parameters_plot_data, aes(x = avg_switchrate, y = delta, color = paper)) +
-  geom_point(size = 4, alpha = 0.8, na.rm = TRUE) +  # Larger points with transparency
-  scale_color_brewer(palette = "Set1") +  # Use a better color palette
-  labs(
-    title = "Delta-Values vs. Average Switchrate",
-    subtitle = "Comparison across Papers",  # Add subtitle for context
-    x = "Average Switchrate",
-    y = "Delta-Values",
-    color = "Paper"
-  ) +  
-  theme_minimal(base_size = 14) +  # Clean theme with larger text
-  theme(
-    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),  # Center title
-    plot.subtitle = element_text(size = 14, hjust = 0.5, color = "gray50"),
-    axis.text = element_text(size = 12),
-    axis.title = element_text(size = 14, face = "bold"),
-    legend.title = element_text(size = 12),
-    legend.text = element_text(size = 11),
-    panel.grid.major = element_line(color = "gray90")  # Softer gridlines
-  )
-
-
-
-
-
-
-
-
-
-
-
-  
-
-
 

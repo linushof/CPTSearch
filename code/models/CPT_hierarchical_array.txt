@@ -4,7 +4,7 @@ model{
 	
 	for (j in 1:nsub) { # subject loop
 	
-	  for (i in 1:nprob[j])	{ # problem loop
+	  for (i in 1:nprob[j])	{ # problem-gain loop 
 
       # subjective values
       
@@ -37,6 +37,9 @@ model{
 	    choice[j,i] ~ dbern(pB[j,i])          #Bernoulli-distribution
 	  
 	  }
+	  
+	  
+	  
 	}
 
 # priors
@@ -60,6 +63,7 @@ model{
   mu.probit.rho ~ dnorm(0,1)T(-5,5) 
   sigma.probit.rho ~ dunif(0,10)
   tau.probit.rho <- pow(sigma.probit.rho,-2)
+
 
   # inverse-probit to obtain values in [0,1]*scale, scale sets prior boundaries
     

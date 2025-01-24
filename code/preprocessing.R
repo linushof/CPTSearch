@@ -81,6 +81,7 @@ dat <- data %>%
   
   ungroup()
 
+unique(dat$paper)
 #Prefilter events that don't add up to a prob of 1 or sprob of 1
 dat <- dat %>% filter((probA1 + probA2 + probA3 + probA4 + probA5 == 1) & 
                         (probB1 + probB2 + probB3 + probB4 + probB5 ==1) & 
@@ -114,7 +115,7 @@ choices <- dat %>%
   ungroup() %>% 
   filter(stop == 1)
 
-
+unique(choices$paper)
 # Storing -----------------------------------------------------------------
 
 write_rds(choices, "data/trial_summaries.rds.bz2", compress = "bz2")
