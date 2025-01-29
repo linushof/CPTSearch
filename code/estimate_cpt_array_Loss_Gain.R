@@ -1,13 +1,14 @@
 # Preparation -------------------------------------------------------------
 
 # load pkgs
-pacman::p_load(tidyverse, R2jags)
-library(viridis)
-library(glue)
-library(tools)
-library(brms)
-library(abind)
-library(coda)
+pacman::p_load(tidyverse , 
+               R2jags , 
+               viridis , 
+               glue ,
+               tools ,
+               brms ,
+               abind , 
+               coda)
 
 # Initialization of regression and parameter plot data frames ------------------------------------------------------------
 
@@ -50,7 +51,7 @@ valid_papers <- c("Gloeckner12", "Ungemach09", "Rakow08", "noguchi15","hertwig04
 #Loop across all papers using JAGS + Generate Estimates + Regression
 for (p in valid_papers) {
   #paper <- read_rds(glue("data/PreprocessedPaperData/cpt_{p}.rds.bz2"))
-  paper <- read_rds("data/PreprocessedPaperData/cpt_kellen16.rds.bz2")
+  paper <- read_rds("data/PreprocessedPaperData/cpt_gloeckner16.rds.bz2")
   papername <- unique(paper$paper)
 
   #sort Subject then Gain then loss problems
@@ -163,11 +164,11 @@ for (p in valid_papers) {
     inits = params_init , # creates list of initial values for each chain
     parameters.to.save = params , 
     model.file = "code/models/CPT_hierarchical_array_Loss_Gain.txt" , # model code, see file
-    n.chains = 4 , # number of MCMC chains
-    n.iter = 2000 , # number of iterations (should be set much higher once it's clear that the model works)
-    n.burnin = 1000 , # first 1000 samples of each chain are discarded
-    n.thin = 1 , # with 1, every sample is stored, with 2, every 2nd sample is stored, ... to reduce autocorrelatons, use higher values. however, higher values require more iterations
-    n.cluster = 4 , # compute MCMC chains in parallel (on different cores of the computer)
+    n.chains = 6 , # number of MCMC chains
+    n.iter = 10000 , # number of iterations (should be set much higher once it's clear that the model works)
+    n.burnin = 5000 , # first 1000 samples of each chain are discarded
+    n.thin = 5 , # with 1, every sample is stored, with 2, every 2nd sample is stored, ... to reduce autocorrelatons, use higher values. however, higher values require more iterations
+    n.cluster = 6 , # compute MCMC chains in parallel (on different cores of the computer)
     DIC = TRUE # store all posterior samples
   )
 
